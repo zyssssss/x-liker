@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Like Summaries</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap" style="width: 360px;">
+      <div class="row between">
+        <h1 style="margin: 0; font-size: 16px;">最近点赞总结</h1>
+        <button id="openOptions" class="btn small">Options</button>
+      </div>
+
+      <div id="list" class="list"></div>
+
+      <div class="row">
+        <button id="clear" class="btn danger">Clear history</button>
+      </div>
+
+      <div class="hint">提示：点赞后需要几秒钟生成。状态为 done 才有内容。</div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

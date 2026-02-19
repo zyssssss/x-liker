@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>X Like → Outline (Options)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Options</h1>
+
+      <label class="lbl">OpenAI API Key</label>
+      <input id="apiKey" type="password" placeholder="sk-..." class="input" />
+      <div class="hint">保存在 chrome.storage.sync。建议使用单独的 key，并注意配额。</div>
+
+      <label class="lbl">Model</label>
+      <input id="model" class="input" placeholder="gpt-4o-mini" />
+
+      <label class="lbl">Language</label>
+      <select id="language" class="input">
+        <option value="zh-CN">中文（zh-CN）</option>
+        <option value="en">English</option>
+      </select>
+
+      <label class="lbl">History max items</label>
+      <input id="maxItems" type="number" min="1" max="200" class="input" />
+
+      <div class="row">
+        <button id="save" class="btn">Save</button>
+        <span id="status" class="status"></span>
+      </div>
+
+      <hr />
+      <p class="hint">
+        使用方法：在 x.com 点赞（Like）一条包含文章链接的推文，稍等片刻，然后打开插件弹窗查看总结。
+      </p>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "X Like → Article Outline",
+  "version": "0.1.0",
+  "description": "When you like a tweet on X, automatically summarize the linked article and/or the tweet thread into an outline.",
+  "action": {
+    "default_title": "Like Summaries",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
