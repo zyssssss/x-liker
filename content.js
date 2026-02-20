@@ -22,7 +22,25 @@ function getTweetPermalink(article) {
 
 function getTweetText(article) {
   const el = article.querySelector('div[data-testid="tweetText"]');
-  return norm(el ? el.innerText : "");
+  const t = norm(el ? el.innerText : "");
+  return t;
+}
+
+function getXArticleText() {
+  // X "Articles" (longform) use a different layout than tweets.
+  // Try to extract the main article text from the page.
+  const root =
+    document.querySelector('[data-testid="article"]') ||
+    document.querySelector('article[role="article"]') ||
+    document.querySelector('main');
+  if (!root) return "";
+
+  // Prefer visible text blocks.
+  const text = norm(root.innerText || "");
+
+  // Heuristic: longform article should be longer than a normal tweet.
+  if (text.length < 200) return "";
+  return text.slice(0, 40000);
 }
 
 function isExternalUrl(url) {
@@ -76,7 +94,11 @@ function getThreadText(article) {
 
 function buildPayloadFromArticle(article) {
   const tweetUrl = getTweetPermalink(article);
-  const tweetText = getTweetText(article);
+  let tweetText = getTweetText(article);
+  const xArticleText = getXArticleText();
+  // If it's an X longform article, prefer its content as the primary text.
+  if (!tweetText && xArticleText) tweetText = xArticleText;
+
   const externalLinks = getExternalLinks(article);
   let threadTexts = getThreadText(article);
   // Avoid duplication: if the first thread text equals the tweet text, drop it.
@@ -87,6 +109,7 @@ function buildPayloadFromArticle(article) {
   return {
     tweetUrl,
     tweetText,
+    xArticleText,
     threadTexts,
     externalLinks,
     pageUrl: location.href,

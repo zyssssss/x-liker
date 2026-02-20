@@ -315,7 +315,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const rawText = buildDownloadText({
           kind: item.kind,
           tweetUrl: item.tweetUrl,
-          tweetText: item.tweetText,
+          tweetText: item.xArticleText || item.tweetText,
           threadTexts: item.threadTexts,
           article
         });
@@ -348,6 +348,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       kind,
       tweetUrl: payload.tweetUrl,
       tweetText: payload.tweetText || "",
+      xArticleText: payload.xArticleText || "",
       threadTexts: payload.threadTexts || [],
       externalLinks: payload.externalLinks || [],
       likedAt: payload.likedAt,
@@ -395,7 +396,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const rawText = buildDownloadText({
           kind,
           tweetUrl: baseItem.tweetUrl,
-          tweetText: baseItem.tweetText,
+          tweetText: baseItem.xArticleText || baseItem.tweetText,
           threadTexts: baseItem.threadTexts,
           article: null
         });
