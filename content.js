@@ -77,32 +77,39 @@ function buildPayloadFromArticle(article) {
   };
 }
 
-function isLikeButton(el) {
-  const btn = el.closest('div[role="button"], button');
-  if (!btn) return false;
-  const testId = btn.getAttribute("data-testid") || "";
-  // like/unlike toggles; treat click on like button as an intent.
-  return testId === "like" || testId === "unlike";
+function findActionElFromEvent(e) {
+  // X's click target can be svg/path inside the button.
+  // Use composedPath() to reliably find the element with data-testid.
+  const path = typeof e.composedPath === "function" ? e.composedPath() : [];
+  for (const n of path) {
+    if (!n || n.nodeType !== 1) continue;
+    const testId = n.getAttribute?.("data-testid") || "";
+    if (testId === "like" || testId === "unlike") return n;
+  }
+  // Fallback: try closest() from target.
+  const t = e.target;
+  if (t && t.closest) {
+    const btn = t.closest('[data-testid="like"], [data-testid="unlike"]');
+    if (btn) return btn;
+  }
+  return null;
 }
 
 function findTweetArticleFromClick(el) {
-  return el.closest('article');
+  return el?.closest ? el.closest("article") : null;
 }
 
 let lastSentKey = null;
 
 async function onClick(e) {
-  const target = e.target;
-  if (!target) return;
-  if (!isLikeButton(target)) return;
+  const actionEl = findActionElFromEvent(e);
+  if (!actionEl) return;
 
-  // Capture intent *before* X swaps the DOM.
-  const btn0 = target.closest('div[role="button"], button');
-  const testId0 = btn0 ? (btn0.getAttribute("data-testid") || "") : "";
   // Only trigger when user clicks the "like" action (not when unliking).
+  const testId0 = actionEl.getAttribute("data-testid") || "";
   if (testId0 !== "like") return;
 
-  const article = findTweetArticleFromClick(target);
+  const article = findTweetArticleFromClick(actionEl);
   if (!article) return;
 
   // DOM changes are async; small delay so tweetUrl/text stabilizes.
