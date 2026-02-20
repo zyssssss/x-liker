@@ -3,7 +3,8 @@
 // calls OpenAI to summarize, stores results in chrome.storage.local.
 
 const DEFAULTS = {
-  model: "gpt-4o-mini",
+  provider: "deepseek", // "deepseek" | "openai"
+  model: "deepseek-chat",
   maxItems: 50,
   language: "zh-CN"
 };
@@ -22,8 +23,12 @@ async function getSettings() {
 }
 
 async function getApiKey() {
-  const { openai_api_key } = await chrome.storage.sync.get(["openai_api_key"]);
-  return (openai_api_key || "").trim();
+  // Backward compatible: accept either deepseek_api_key or openai_api_key
+  const { deepseek_api_key, openai_api_key } = await chrome.storage.sync.get([
+    "deepseek_api_key",
+    "openai_api_key"
+  ]);
+  return (deepseek_api_key || openai_api_key || "").trim();
 }
 
 async function addHistoryItem(item) {
@@ -111,9 +116,15 @@ async function fetchArticle(url) {
   return { ...meta, text: capped, contentType: ct };
 }
 
-async function openaiOutline({ model, language, tweetText, threadTexts, article }) {
+async function llmOutline({ provider, model, language, tweetText, threadTexts, article }) {
   const apiKey = await getApiKey();
-  if (!apiKey) throw new Error("Missing OpenAI API key. Set it in extension Options.");
+  if (!apiKey) {
+    throw new Error(
+      provider === "openai"
+        ? "Missing OpenAI API key. Set it in extension Options."
+        : "Missing DeepSeek API key. Set it in extension Options."
+    );
+  }
 
   const system =
     language.startsWith("zh")
@@ -145,7 +156,12 @@ async function openaiOutline({ model, language, tweetText, threadTexts, article 
     temperature: 0.2
   };
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const endpoint =
+    provider === "openai"
+      ? "https://api.openai.com/v1/chat/completions"
+      : "https://api.deepseek.com/v1/chat/completions";
+
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -156,7 +172,8 @@ async function openaiOutline({ model, language, tweetText, threadTexts, article 
 
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`OpenAI error ${res.status}: ${t.slice(0, 300)}`);
+    const label = provider === "openai" ? "OpenAI" : "DeepSeek";
+    throw new Error(`${label} error ${res.status}: ${t.slice(0, 300)}`);
   }
 
   const json = await res.json();
@@ -195,7 +212,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       await updateHistoryItem(baseItem.tweetUrl, { status: "summarizing", article });
 
-      const outline = await openaiOutline({
+      const outline = await llmOutline({
+        provider: settings.provider,
         model: settings.model,
         language: settings.language,
         tweetText: baseItem.tweetText,

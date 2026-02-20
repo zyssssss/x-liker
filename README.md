@@ -18,11 +18,14 @@
 3. 点击【加载已解压的扩展程序】
 4. 选择本项目文件夹 `x-like-outline/`
 
-## 配置 OpenAI
+## 配置 DeepSeek / OpenAI
 
 1. 安装后，点击插件 → Options
-2. 填入 `OpenAI API Key`
-3. 模型默认 `gpt-4o-mini`
+2. Provider 选择：`DeepSeek`（默认）或 `OpenAI`
+3. 填入对应的 API Key
+4. 模型默认：
+   - DeepSeek：`deepseek-chat`
+   - OpenAI：`gpt-4o-mini`
 
 > API Key 保存在 `chrome.storage.sync`（浏览器同步存储）。建议使用单独 key。
 

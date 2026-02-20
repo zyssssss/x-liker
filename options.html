@@ -9,12 +9,18 @@
     <div class="wrap">
       <h1>Options</h1>
 
-      <label class="lbl">OpenAI API Key</label>
-      <input id="apiKey" type="password" placeholder="sk-..." class="input" />
+      <label class="lbl">Provider</label>
+      <select id="provider" class="input">
+        <option value="deepseek">DeepSeek</option>
+        <option value="openai">OpenAI</option>
+      </select>
+
+      <label class="lbl">API Key</label>
+      <input id="apiKey" type="password" placeholder="your-api-key" class="input" />
       <div class="hint">保存在 chrome.storage.sync。建议使用单独的 key，并注意配额。</div>
 
       <label class="lbl">Model</label>
-      <input id="model" class="input" placeholder="gpt-4o-mini" />
+      <input id="model" class="input" placeholder="deepseek-chat" />
 
       <label class="lbl">Language</label>
       <select id="language" class="input">
