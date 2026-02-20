@@ -96,21 +96,17 @@ async function onClick(e) {
   if (!target) return;
   if (!isLikeButton(target)) return;
 
+  // Capture intent *before* X swaps the DOM.
+  const btn0 = target.closest('div[role="button"], button');
+  const testId0 = btn0 ? (btn0.getAttribute("data-testid") || "") : "";
+  // Only trigger when user clicks the "like" action (not when unliking).
+  if (testId0 !== "like") return;
+
   const article = findTweetArticleFromClick(target);
   if (!article) return;
 
-  // We want to trigger only when it becomes "liked".
-  // But DOM changes are async; do a small delay then check for unlike state.
-  await new Promise((r) => setTimeout(r, 300));
-
-  // If the button is now "unlike", the tweet is liked.
-  const btn = target.closest('div[role="button"], button');
-  const testId = btn ? (btn.getAttribute("data-testid") || "") : "";
-  const isNowLiked = testId === "unlike";
-  if (!isNowLiked) {
-    log("Clicked like but not liked (maybe unliked)");
-    return;
-  }
+  // DOM changes are async; small delay so tweetUrl/text stabilizes.
+  await new Promise((r) => setTimeout(r, 250));
 
   const payload = buildPayloadFromArticle(article);
   if (!payload.tweetUrl) {
@@ -123,7 +119,15 @@ async function onClick(e) {
   lastSentKey = key;
 
   log("Sending payload", payload);
-  chrome.runtime.sendMessage({ type: "LIKE_EVENT", payload });
+  try {
+    chrome.runtime.sendMessage({ type: "LIKE_EVENT", payload }, (resp) => {
+      const err = chrome.runtime.lastError;
+      if (err) console.warn("[x-like-outline] sendMessage failed:", err.message);
+      else log("Background ack", resp);
+    });
+  } catch (err) {
+    console.warn("[x-like-outline] sendMessage threw:", err);
+  }
 }
 
 document.addEventListener("click", onClick, true);
