@@ -41,24 +41,46 @@ async function render() {
     const meta = el("div", { class: "hint", text: `${fmtTime(item.likedAt)}${item.article?.finalUrl ? " · " + item.article.finalUrl : ""}` });
 
     const body = el("pre", { class: "pre" });
-    body.textContent = item.outline || (item.error ? `Error: ${item.error}` : "(no outline yet)");
+    const primaryText = item.outline || item.rawText || "";
+    body.textContent = primaryText || (item.error ? `Error: ${item.error}` : "(no outline yet)");
 
-    const actions = el("div", { class: "row" }, [
-      el("button", { class: "btn small", text: "Copy" }),
-      el("button", { class: "btn small", text: "Open article" })
-    ]);
+    const btnCopy = el("button", { class: "btn small", text: "Copy" });
+    const btnOpen = el("button", { class: "btn small", text: "Open article" });
+    const btnDl = el("button", { class: "btn small", text: "Download .txt" });
 
-    actions.children[0].addEventListener("click", async () => {
-      const text = item.outline || "";
+    const actions = el("div", { class: "row" }, [btnCopy, btnOpen, btnDl]);
+
+    btnCopy.addEventListener("click", async () => {
+      const text = primaryText || "";
       await navigator.clipboard.writeText(text);
-      actions.children[0].textContent = "Copied";
-      setTimeout(() => (actions.children[0].textContent = "Copy"), 800);
+      btnCopy.textContent = "Copied";
+      setTimeout(() => (btnCopy.textContent = "Copy"), 800);
     });
 
-    actions.children[1].addEventListener("click", async () => {
+    btnOpen.addEventListener("click", async () => {
       const url = item.article?.finalUrl || (item.externalLinks && item.externalLinks[0]);
       if (!url) return;
       chrome.tabs.create({ url });
+    });
+
+    // Only enable download when we have rawText (bookmark event).
+    const canDownload = !!item.rawText && item.status === "done";
+    btnDl.disabled = !canDownload;
+    btnDl.style.opacity = canDownload ? "1" : "0.5";
+    btnDl.addEventListener("click", async () => {
+      if (!canDownload) return;
+      const text = item.rawText || "";
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      try {
+        await chrome.downloads.download({
+          url,
+          filename: item.downloadName || "x-liker/bookmark.txt",
+          saveAs: true
+        });
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
     });
 
     const card = el("div", { class: "card" }, [header, meta, body, actions]);

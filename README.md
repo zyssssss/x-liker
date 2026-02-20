@@ -31,11 +31,18 @@
 
 ## 使用
 
+### 1) 点赞总结（Like → Outline）
 1. 打开 https://x.com
 2. 点击浏览器工具栏的扩展图标（会打开右侧 Side Panel，可一直挂着）
 3. 找一条包含文章链接的推文，点击 Like
 4. 等待几秒
 5. 在 Side Panel 里查看状态为 `done` 的总结；可 Copy/打开文章
+
+### 2) 收藏下载（Bookmark → Crawl → Download）
+1. 在推文上点击“收藏/Bookmark”按钮
+2. 插件会自动抓取：推文/线程文本 +（如有）外链文章正文节选
+3. Side Panel 会出现一条记录，并提供 **Download .txt** 按钮
+4. 点击 Download .txt，会把抓取内容以纯文本下载到本地
 
 ## 注意
 

@@ -183,22 +183,58 @@ async function llmOutline({ provider, model, language, tweetText, threadTexts, a
   return norm(content || "");
 }
 
+function safeFilename(s) {
+  return (s || "")
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+function buildDownloadText({ kind, tweetUrl, tweetText, threadTexts, article }) {
+  const lines = [];
+  if (kind) lines.push(`# kind: ${kind}`);
+  if (tweetUrl) lines.push(`Tweet: ${tweetUrl}`);
+  if (article?.finalUrl) lines.push(`Article: ${article.finalUrl}`);
+  if (article?.title) lines.push(`Title: ${article.title}`);
+  if (article?.description) lines.push(`Description: ${article.description}`);
+  lines.push("\n---\n");
+  if (tweetText) {
+    lines.push("Tweet text:\n" + tweetText);
+    lines.push("\n---\n");
+  }
+  if (Array.isArray(threadTexts) && threadTexts.length) {
+    lines.push("Thread texts:\n- " + threadTexts.join("\n- "));
+    lines.push("\n---\n");
+  }
+  if (article?.text) {
+    lines.push("Article text (excerpt):\n" + article.text);
+  }
+  return lines.join("\n").trim();
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type !== "LIKE_EVENT") return;
+  if (msg?.type !== "LIKE_EVENT" && msg?.type !== "BOOKMARK_EVENT") return;
+
   (async () => {
     const settings = await getSettings();
     const payload = msg.payload || {};
+    const kind = msg.type === "LIKE_EVENT" ? "like" : "bookmark";
 
     const baseItem = {
       id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      kind,
       tweetUrl: payload.tweetUrl,
       tweetText: payload.tweetText || "",
       threadTexts: payload.threadTexts || [],
       externalLinks: payload.externalLinks || [],
       likedAt: payload.likedAt,
+      savedAt: payload.savedAt,
       status: "queued",
       article: null,
       outline: "",
+      rawText: "",
+      downloadName: "",
       error: ""
     };
 
@@ -212,18 +248,38 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (firstLink) {
         article = await fetchArticle(firstLink);
       }
-      await updateHistoryItem(baseItem.tweetUrl, { status: "summarizing", article });
 
-      const outline = await llmOutline({
-        provider: settings.provider,
-        model: settings.model,
-        language: settings.language,
-        tweetText: baseItem.tweetText,
-        threadTexts: baseItem.threadTexts,
-        article
-      });
+      if (kind === "like") {
+        await updateHistoryItem(baseItem.tweetUrl, { status: "summarizing", article });
 
-      await updateHistoryItem(baseItem.tweetUrl, { status: "done", outline, article });
+        const outline = await llmOutline({
+          provider: settings.provider,
+          model: settings.model,
+          language: settings.language,
+          tweetText: baseItem.tweetText,
+          threadTexts: baseItem.threadTexts,
+          article
+        });
+
+        await updateHistoryItem(baseItem.tweetUrl, { status: "done", outline, article });
+      } else {
+        // bookmark: no LLM; just crawl and prepare downloadable text.
+        const rawText = buildDownloadText({
+          kind,
+          tweetUrl: baseItem.tweetUrl,
+          tweetText: baseItem.tweetText,
+          threadTexts: baseItem.threadTexts,
+          article
+        });
+        const nameBase = safeFilename(article?.title || baseItem.tweetText || "x-bookmark");
+        const downloadName = `x-liker/${nameBase || "x-bookmark"}.txt`;
+        await updateHistoryItem(baseItem.tweetUrl, {
+          status: "done",
+          article,
+          rawText,
+          downloadName
+        });
+      }
     } catch (e) {
       await updateHistoryItem(baseItem.tweetUrl, {
         status: "error",

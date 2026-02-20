@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "X Like → Article Outline",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "When you like a tweet on X, automatically summarize the linked article and/or the tweet thread into an outline.",
   "action": {
     "default_title": "Like Summaries"
@@ -10,7 +10,7 @@
     "default_path": "panel.html"
   },
   "options_page": "options.html",
-  "permissions": ["storage", "sidePanel", "tabs"],
+  "permissions": ["storage", "sidePanel", "tabs", "downloads"],
   "host_permissions": [
     "https://x.com/*",
     "https://twitter.com/*",

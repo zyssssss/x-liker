@@ -84,12 +84,21 @@ function findActionElFromEvent(e) {
   for (const n of path) {
     if (!n || n.nodeType !== 1) continue;
     const testId = n.getAttribute?.("data-testid") || "";
-    if (testId === "like" || testId === "unlike") return n;
+    if (
+      testId === "like" ||
+      testId === "unlike" ||
+      testId === "bookmark" ||
+      testId === "removeBookmark"
+    ) {
+      return n;
+    }
   }
   // Fallback: try closest() from target.
   const t = e.target;
   if (t && t.closest) {
-    const btn = t.closest('[data-testid="like"], [data-testid="unlike"]');
+    const btn = t.closest(
+      '[data-testid="like"], [data-testid="unlike"], [data-testid="bookmark"], [data-testid="removeBookmark"]'
+    );
     if (btn) return btn;
   }
   return null;
@@ -105,9 +114,13 @@ async function onClick(e) {
   const actionEl = findActionElFromEvent(e);
   if (!actionEl) return;
 
-  // Only trigger when user clicks the "like" action (not when unliking).
   const testId0 = actionEl.getAttribute("data-testid") || "";
-  if (testId0 !== "like") return;
+
+  let eventType = null;
+  if (testId0 === "like") eventType = "LIKE_EVENT";
+  if (testId0 === "bookmark") eventType = "BOOKMARK_EVENT";
+  // Only trigger on the positive actions (not unlike / removeBookmark)
+  if (!eventType) return;
 
   const article = findTweetArticleFromClick(actionEl);
   if (!article) return;
@@ -121,13 +134,16 @@ async function onClick(e) {
     return;
   }
 
-  const key = payload.tweetUrl;
+  const key = `${eventType}:${payload.tweetUrl}`;
   if (lastSentKey === key) return;
   lastSentKey = key;
 
-  log("Sending payload", payload);
+  // attach timestamp field depending on event
+  if (eventType === "BOOKMARK_EVENT") payload.savedAt = new Date().toISOString();
+
+  log("Sending payload", eventType, payload);
   try {
-    chrome.runtime.sendMessage({ type: "LIKE_EVENT", payload }, (resp) => {
+    chrome.runtime.sendMessage({ type: eventType, payload }, (resp) => {
       const err = chrome.runtime.lastError;
       if (err) console.warn("[x-like-outline] sendMessage failed:", err.message);
       else log("Background ack", resp);
