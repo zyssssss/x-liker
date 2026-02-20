@@ -49,23 +49,40 @@ function getExternalLinks(article) {
 }
 
 function getThreadText(article) {
-  // Best-effort: gather nearby tweet texts in the current conversation view.
-  // We keep it conservative to avoid grabbing the whole timeline.
-  const container = article.closest('div[aria-label][role="region"], main') || document;
+  // IMPORTANT:
+  // On home timeline / lists, the surrounding DOM contains unrelated tweets/ads.
+  // Only collect thread texts when we're on a /status/ page (conversation view).
+  const onStatusPage = /\/status\//.test(location.pathname);
+  if (!onStatusPage) return [];
+
+  // Conversation timeline container (best effort; X can change labels).
+  const container =
+    document.querySelector('div[aria-label^="Timeline: Conversation"]') ||
+    document.querySelector('div[aria-label*="Conversation"]') ||
+    article.closest('main') ||
+    document;
+
   const texts = [];
   const tweetEls = Array.from(container.querySelectorAll('article div[data-testid="tweetText"]'));
-  for (const el of tweetEls.slice(0, 8)) {
+  for (const el of tweetEls.slice(0, 12)) {
     const t = norm(el.innerText);
-    if (t) texts.push(t);
+    if (!t) continue;
+    texts.push(t);
   }
-  return texts;
+
+  // de-dupe + drop the first one if it's identical to the main tweetText
+  return Array.from(new Set(texts));
 }
 
 function buildPayloadFromArticle(article) {
   const tweetUrl = getTweetPermalink(article);
   const tweetText = getTweetText(article);
   const externalLinks = getExternalLinks(article);
-  const threadTexts = getThreadText(article);
+  let threadTexts = getThreadText(article);
+  // Avoid duplication: if the first thread text equals the tweet text, drop it.
+  if (threadTexts.length && tweetText && threadTexts[0] === tweetText) {
+    threadTexts = threadTexts.slice(1);
+  }
 
   return {
     tweetUrl,
