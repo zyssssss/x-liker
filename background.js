@@ -245,3 +245,35 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.storage.sync.set({ settings });
   }
 });
+
+// Keep the UI visible: open Side Panel when the user clicks the extension icon.
+chrome.action.onClicked.addListener(async (tab) => {
+  try {
+    if (chrome.sidePanel?.setOptions) {
+      await chrome.sidePanel.setOptions({
+        tabId: tab?.id,
+        path: "panel.html",
+        enabled: true
+      });
+    }
+    if (chrome.sidePanel?.open && tab?.id != null) {
+      await chrome.sidePanel.open({ tabId: tab.id });
+      return;
+    }
+  } catch (e) {
+    // fall through
+    console.warn("Failed to open side panel", e);
+  }
+
+  // Fallback for older Chrome: open a small popup window.
+  try {
+    await chrome.windows.create({
+      url: chrome.runtime.getURL("panel.html"),
+      type: "popup",
+      width: 420,
+      height: 720
+    });
+  } catch (e) {
+    console.warn("Failed to open panel window", e);
+  }
+});

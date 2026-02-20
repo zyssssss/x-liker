@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Like Summaries (Side Panel)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap" style="width: auto; min-width: 320px;">
+      <div class="row between">
+        <h1 style="margin: 0; font-size: 16px;">最近点赞总结</h1>
+        <button id="openOptions" class="btn small">Options</button>
+      </div>
+
+      <div id="list" class="list"></div>
+
+      <div class="row">
+        <button id="clear" class="btn danger">Clear history</button>
+      </div>
+
+      <div class="hint">提示：点赞后需要几秒钟生成。状态为 done 才有内容。</div>
+      <div class="hint">你可以把这个 Side Panel 一直固定在浏览器右侧，不用反复点插件图标。</div>
+    </div>
+
+    <script src="panel.js"></script>
+  </body>
+</html>
