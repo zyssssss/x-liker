@@ -43,7 +43,7 @@ async function render() {
 
     const header = el("div", { class: "row between" }, [
       el("a", { class: "link", href: item.tweetUrl, target: "_blank", text: title }),
-      el("span", { class: "pill", text: status })
+      el("span", { class: "pill", "data-status": status, text: status })
     ]);
 
     const meta = el("div", {
