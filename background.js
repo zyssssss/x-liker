@@ -5,7 +5,9 @@
 const DEFAULTS = {
   provider: "deepseek", // "deepseek" | "openai"
   model: "deepseek-chat",
-  maxItems: 50,
+  // Keep only the latest item by default (auto-clear previous).
+  // You can change this in Options.
+  maxItems: 1,
   language: "zh-CN"
 };
 

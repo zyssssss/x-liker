@@ -19,7 +19,7 @@ async function load() {
 
   $("model").value = settings?.model || (provider === "openai" ? "gpt-4o-mini" : "deepseek-chat");
   $("language").value = settings?.language || "zh-CN";
-  $("maxItems").value = settings?.maxItems || 50;
+  $("maxItems").value = settings?.maxItems ?? 1;
 }
 
 async function save() {
