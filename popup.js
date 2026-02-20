@@ -108,6 +108,41 @@ document.getElementById("openOptions").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
+async function downloadTextFile({ text, filename, saveAs }) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  try {
+    await chrome.downloads.download({
+      url,
+      filename: filename || "x-liker/export.txt",
+      saveAs: !!saveAs
+    });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+}
+
+document.getElementById("downloadAll").addEventListener("click", async () => {
+  const { history } = await chrome.storage.local.get(["history"]);
+  const arr = Array.isArray(history) ? history : [];
+  const done = arr.filter((x) => x?.status === "done" && x?.rawText);
+  if (!done.length) {
+    alert("No downloadable items yet (need status=done). ");
+    return;
+  }
+
+  const combined = done
+    .map((x, i) => `===== ${i + 1}/${done.length} =====\n${x.rawText}`)
+    .join("\n\n");
+
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  await downloadTextFile({
+    text: combined,
+    filename: `x-liker/x-liker-export-${ts}.txt`,
+    saveAs: true
+  });
+});
+
 document.getElementById("clear").addEventListener("click", async () => {
   if (!confirm("Clear all history?")) return;
   await chrome.storage.local.set({ history: [] });

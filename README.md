@@ -37,6 +37,7 @@
 3. 找一条包含文章链接的推文，点击 Like
 4. 等待几秒
 5. 在 Side Panel 里查看状态为 `done` 的总结；可 Copy/打开文章
+6. Like 也支持 **Download .txt**（会把推文/线程/外链文章节选 + Outline 一起保存）
 
 ### 2) 收藏下载（Bookmark → Tweet first → Optional external）
 1. 在推文上点击“收藏/Bookmark”按钮
@@ -45,6 +46,10 @@
    - 你点了才会去抓外链文章正文，并把 txt 更新为“推文 + 外链文章”
    - 优先用 fetch 抓取；如果遇到反爬导致 `failed to fetch`，会自动改用“后台打开页面 → DOM 抓取”
 4. 点击 **Download .txt** 下载纯文本
+
+### 批量下载（100 条一键导出）
+- 在 Side Panel 底部点击 **Download all (.txt)**，会把当前历史里所有 `done` 的条目合并成一个 txt 下载
+- 想下载 100 条：把 Options 里的 `History max items` 设成 100
 
 ## 注意
 

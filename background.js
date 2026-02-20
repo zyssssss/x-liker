@@ -250,7 +250,7 @@ function safeFilename(s) {
     .slice(0, 120);
 }
 
-function buildDownloadText({ kind, tweetUrl, tweetText, threadTexts, article }) {
+function buildDownloadText({ kind, tweetUrl, tweetText, threadTexts, article, outline }) {
   const lines = [];
   if (kind) lines.push(`# kind: ${kind}`);
   if (tweetUrl) lines.push(`Tweet: ${tweetUrl}`);
@@ -276,6 +276,11 @@ function buildDownloadText({ kind, tweetUrl, tweetText, threadTexts, article }) 
 
   if (article?.text) {
     lines.push("Article text (excerpt):\n" + article.text);
+    lines.push("\n---\n");
+  }
+
+  if (outline) {
+    lines.push("Outline:\n" + outline);
   }
 
   return lines.join("\n").trim();
@@ -317,7 +322,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           tweetUrl: item.tweetUrl,
           tweetText: item.xArticleText || item.tweetText,
           threadTexts: item.threadTexts,
-          article
+          article,
+          outline: item.outline
         });
 
         const nameBase = safeFilename(article?.title || item.tweetText || "x-bookmark");
@@ -388,7 +394,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           article
         });
 
-        await updateHistoryItem(baseItem.tweetUrl, { status: "done", outline, article });
+        const rawText = buildDownloadText({
+          kind,
+          tweetUrl: baseItem.tweetUrl,
+          tweetText: baseItem.xArticleText || baseItem.tweetText,
+          threadTexts: baseItem.threadTexts,
+          article,
+          outline
+        });
+
+        const nameBase = safeFilename(article?.title || baseItem.tweetText || "x-like");
+        const downloadName = `x-liker/${nameBase || "x-like"}.txt`;
+
+        await updateHistoryItem(baseItem.tweetUrl, {
+          status: "done",
+          outline,
+          article,
+          rawText,
+          downloadName
+        });
       } else {
         // bookmark: FIRST save tweet/thread text (what user wants most)
         await updateHistoryItem(baseItem.tweetUrl, { status: "preparing" });
@@ -398,7 +422,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           tweetUrl: baseItem.tweetUrl,
           tweetText: baseItem.xArticleText || baseItem.tweetText,
           threadTexts: baseItem.threadTexts,
-          article: null
+          article: null,
+          outline: null
         });
 
         const nameBase = safeFilename(baseItem.tweetText || "x-bookmark");

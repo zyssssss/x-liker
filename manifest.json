@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "X Like → Article Outline",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "When you like a tweet on X, automatically summarize the linked article and/or the tweet thread into an outline.",
   "action": {
     "default_title": "Like Summaries"
