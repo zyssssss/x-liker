@@ -239,16 +239,39 @@ chrome.runtime.onInstalled.addListener(async () => {
   const settings = await getSettings();
   await chrome.action.setBadgeBackgroundColor({ color: "#444" });
   await chrome.action.setBadgeText({ text: "" });
+
   // initialize settings if empty
   const cur = await chrome.storage.sync.get(["settings"]);
   if (!cur.settings) {
     await chrome.storage.sync.set({ settings });
   }
+
+  // Prefer integrated Side Panel experience.
+  try {
+    if (chrome.sidePanel?.setOptions) {
+      // Set defaults (applies when tabId is omitted).
+      await chrome.sidePanel.setOptions({ path: "panel.html", enabled: true });
+    }
+    if (chrome.sidePanel?.setPanelBehavior) {
+      // When user clicks extension icon, open the panel (Chrome-managed).
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    }
+  } catch (e) {
+    // Older Chrome versions may not support sidePanel.
+    console.warn("Side panel setup failed", e);
+  }
 });
 
 // Keep the UI visible: open Side Panel when the user clicks the extension icon.
+// Note: Side Panel is part of Chrome UI (not a floating window). It will stay on the right
+// while you navigate in the same tab.
 chrome.action.onClicked.addListener(async (tab) => {
   try {
+    if (!chrome.sidePanel?.open) {
+      throw new Error("Side Panel API not available in this Chrome version");
+    }
+
+    // Ensure panel is enabled and uses our panel page.
     if (chrome.sidePanel?.setOptions) {
       await chrome.sidePanel.setOptions({
         tabId: tab?.id,
@@ -256,24 +279,13 @@ chrome.action.onClicked.addListener(async (tab) => {
         enabled: true
       });
     }
-    if (chrome.sidePanel?.open && tab?.id != null) {
+
+    if (tab?.id != null) {
       await chrome.sidePanel.open({ tabId: tab.id });
-      return;
     }
   } catch (e) {
-    // fall through
+    // If Side Panel isn't supported, we intentionally do NOT open a floating window.
+    // User wants it integrated with Chrome.
     console.warn("Failed to open side panel", e);
-  }
-
-  // Fallback for older Chrome: open a small popup window.
-  try {
-    await chrome.windows.create({
-      url: chrome.runtime.getURL("panel.html"),
-      type: "popup",
-      width: 420,
-      height: 720
-    });
-  } catch (e) {
-    console.warn("Failed to open panel window", e);
   }
 });
