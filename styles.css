@@ -1,23 +1,23 @@
 :root {
-  --bg: #0b0f19;
-  --panel: rgba(255, 255, 255, 0.06);
-  --panel2: rgba(255, 255, 255, 0.04);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.64);
-  --border: rgba(255, 255, 255, 0.10);
-  --accent: #7aa2ff;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --err: #fb7185;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --bg: #f6f7fb;
+  --panel: rgba(255, 255, 255, 0.92);
+  --panel2: rgba(255, 255, 255, 0.82);
+  --text: rgba(17, 24, 39, 0.92);
+  --muted: rgba(17, 24, 39, 0.60);
+  --border: rgba(17, 24, 39, 0.10);
+  --accent: #2563eb;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --err: #dc2626;
+  --shadow: 0 10px 24px rgba(17, 24, 39, 0.10);
 }
 
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   margin: 0;
   color: var(--text);
-  background: radial-gradient(1000px 600px at 0% 0%, rgba(122, 162, 255, 0.22), transparent 60%),
-    radial-gradient(1000px 600px at 100% 0%, rgba(74, 222, 128, 0.10), transparent 55%),
+  background: radial-gradient(900px 520px at 0% 0%, rgba(37, 99, 235, 0.10), transparent 60%),
+    radial-gradient(900px 520px at 100% 0%, rgba(22, 163, 74, 0.08), transparent 55%),
     var(--bg);
 }
 
@@ -35,16 +35,16 @@ body {
   width: 100%;
   padding: 9px 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.78);
   color: var(--text);
   outline: none;
 }
 
 .input:focus {
-  border-color: rgba(122, 162, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(122, 162, 255, 0.18);
+  border-color: rgba(37, 99, 235, 0.40);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
 .row {
@@ -59,23 +59,23 @@ body {
 .btn {
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
   color: var(--text);
   cursor: pointer;
 }
 
-.btn:hover { background: rgba(255, 255, 255, 0.10); }
+.btn:hover { background: rgba(255, 255, 255, 0.98); }
 
 .btn.small { padding: 5px 8px; font-size: 12px; }
 
 .btn.danger {
-  border-color: rgba(251, 113, 133, 0.45);
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(251, 113, 133, 0.12);
+  border-color: rgba(220, 38, 38, 0.22);
+  color: rgba(220, 38, 38, 0.95);
+  background: rgba(220, 38, 38, 0.08);
 }
 
-.btn.danger:hover { background: rgba(251, 113, 133, 0.18); }
+.btn.danger:hover { background: rgba(220, 38, 38, 0.12); }
 
 .status { font-size: 12px; color: var(--ok); }
 
@@ -89,6 +89,7 @@ body {
   padding: 12px;
   background: linear-gradient(180deg, var(--panel), var(--panel2));
   box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
 }
 
 .link {
@@ -108,29 +109,29 @@ body {
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.70);
 }
 
-.pill[data-status="done"] { border-color: rgba(74, 222, 128, 0.35); color: rgba(74, 222, 128, 0.95); }
+.pill[data-status="done"] { border-color: rgba(22, 163, 74, 0.25); color: var(--ok); background: rgba(22, 163, 74, 0.08); }
 .pill[data-status="summarizing"],
-.pill[data-status="fetching"] { border-color: rgba(251, 191, 36, 0.35); color: rgba(251, 191, 36, 0.95); }
-.pill[data-status="error"] { border-color: rgba(251, 113, 133, 0.45); color: rgba(251, 113, 133, 0.95); }
+.pill[data-status="fetching"] { border-color: rgba(217, 119, 6, 0.25); color: var(--warn); background: rgba(217, 119, 6, 0.08); }
+.pill[data-status="error"] { border-color: rgba(220, 38, 38, 0.25); color: var(--err); background: rgba(220, 38, 38, 0.08); }
 
 .pre {
   white-space: pre-wrap;
   font-size: 12px;
-  line-height: 1.45;
-  background: rgba(0, 0, 0, 0.25);
+  line-height: 1.50;
+  background: rgba(17, 24, 39, 0.04);
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(17, 24, 39, 0.08);
   margin: 10px 0 0 0;
   max-height: 260px;
   overflow: auto;
 }
 
 pre::-webkit-scrollbar { height: 10px; width: 10px; }
-pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
-pre::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 999px; }
+pre::-webkit-scrollbar-thumb { background: rgba(17,24,39,0.16); border-radius: 999px; }
+pre::-webkit-scrollbar-track { background: rgba(17,24,39,0.06); border-radius: 999px; }
 
 hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
