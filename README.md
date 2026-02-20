@@ -40,7 +40,9 @@
 
 ### 2) 收藏下载（Bookmark → Crawl → Download）
 1. 在推文上点击“收藏/Bookmark”按钮
-2. 插件会自动抓取：推文/线程文本 +（如有）外链文章正文节选
+2. 插件会自动抓取：推文/线程文本 +（如有）外链文章正文
+   - 优先用 fetch 抓取
+   - 如果遇到站点反爬导致 `failed to fetch`，会自动改用“后台打开页面 → DOM 抓取”的方式
 3. Side Panel 会出现一条记录，并提供 **Download .txt** 按钮
 4. 点击 Download .txt，会把抓取内容以纯文本下载到本地
 

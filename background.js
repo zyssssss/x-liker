@@ -118,6 +118,65 @@ async function fetchArticle(url) {
   return { ...meta, text: capped, contentType: ct };
 }
 
+async function scrapeArticleViaTab(url) {
+  // Some sites block fetch() from extension SW; use a real tab render + DOM extraction.
+  // This is best-effort and capped.
+  const finalUrl = await resolveFinalUrl(url);
+
+  const tab = await chrome.tabs.create({ url: finalUrl, active: false });
+  const tabId = tab.id;
+  if (tabId == null) throw new Error("Failed to create tab for scraping");
+
+  const waitComplete = async (timeoutMs = 20000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const t = await chrome.tabs.get(tabId);
+      if (t.status === "complete") return;
+      await sleep(250);
+    }
+    throw new Error("Timeout waiting for article tab to load");
+  };
+
+  try {
+    await waitComplete();
+
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
+        const title =
+          norm(document.querySelector('meta[property="og:title"]')?.content) ||
+          norm(document.title);
+        const description =
+          norm(document.querySelector('meta[property="og:description"]')?.content) ||
+          norm(document.querySelector('meta[name="description"]')?.content);
+
+        // naive main text extraction
+        const text = (document.body?.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
+        return {
+          title,
+          description,
+          text: text.slice(0, 40000)
+        };
+      }
+    });
+
+    return {
+      finalUrl,
+      title: result?.title || "",
+      description: result?.description || "",
+      text: result?.text || "",
+      contentType: "text/html"
+    };
+  } finally {
+    try {
+      await chrome.tabs.remove(tabId);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 async function llmOutline({ provider, model, language, tweetText, threadTexts, article }) {
   const apiKey = await getApiKey();
   if (!apiKey) {
@@ -246,7 +305,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     try {
       await updateHistoryItem(baseItem.tweetUrl, { status: "fetching" });
       if (firstLink) {
-        article = await fetchArticle(firstLink);
+        try {
+          article = await fetchArticle(firstLink);
+        } catch (e) {
+          // fallback: render in a background tab and scrape DOM
+          article = await scrapeArticleViaTab(firstLink);
+        }
       }
 
       if (kind === "like") {
@@ -264,6 +328,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await updateHistoryItem(baseItem.tweetUrl, { status: "done", outline, article });
       } else {
         // bookmark: no LLM; just crawl and prepare downloadable text.
+        await updateHistoryItem(baseItem.tweetUrl, { status: "preparing", article });
         const rawText = buildDownloadText({
           kind,
           tweetUrl: baseItem.tweetUrl,
