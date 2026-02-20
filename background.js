@@ -254,29 +254,92 @@ function buildDownloadText({ kind, tweetUrl, tweetText, threadTexts, article }) 
   const lines = [];
   if (kind) lines.push(`# kind: ${kind}`);
   if (tweetUrl) lines.push(`Tweet: ${tweetUrl}`);
-  if (article?.finalUrl) lines.push(`Article: ${article.finalUrl}`);
-  if (article?.title) lines.push(`Title: ${article.title}`);
-  if (article?.description) lines.push(`Description: ${article.description}`);
+
   lines.push("\n---\n");
+
   if (tweetText) {
     lines.push("Tweet text:\n" + tweetText);
     lines.push("\n---\n");
   }
+
   if (Array.isArray(threadTexts) && threadTexts.length) {
     lines.push("Thread texts:\n- " + threadTexts.join("\n- "));
     lines.push("\n---\n");
   }
+
+  if (article?.finalUrl) {
+    lines.push(`Article: ${article.finalUrl}`);
+    if (article?.title) lines.push(`Title: ${article.title}`);
+    if (article?.description) lines.push(`Description: ${article.description}`);
+    lines.push("\n---\n");
+  }
+
   if (article?.text) {
     lines.push("Article text (excerpt):\n" + article.text);
   }
+
   return lines.join("\n").trim();
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type !== "LIKE_EVENT" && msg?.type !== "BOOKMARK_EVENT") return;
+  if (msg?.type !== "LIKE_EVENT" && msg?.type !== "BOOKMARK_EVENT" && msg?.type !== "FETCH_ARTICLE_FOR") return;
 
   (async () => {
     const settings = await getSettings();
+
+    // User-triggered: fetch article later for an existing bookmark item
+    if (msg?.type === "FETCH_ARTICLE_FOR") {
+      const tweetUrl = msg?.tweetUrl;
+      if (!tweetUrl) return;
+
+      const { history } = await chrome.storage.local.get(["history"]);
+      const arr = Array.isArray(history) ? history : [];
+      const item = arr.find((x) => x?.tweetUrl === tweetUrl);
+      if (!item) return;
+
+      const firstLink = (item.externalLinks || [])[0];
+      if (!firstLink) {
+        await updateHistoryItem(tweetUrl, { error: "No external link found", status: "done" });
+        return;
+      }
+
+      await updateHistoryItem(tweetUrl, { status: "fetching-article", error: "" });
+      let article = null;
+      try {
+        try {
+          article = await fetchArticle(firstLink);
+        } catch {
+          article = await scrapeArticleViaTab(firstLink);
+        }
+
+        const rawText = buildDownloadText({
+          kind: item.kind,
+          tweetUrl: item.tweetUrl,
+          tweetText: item.tweetText,
+          threadTexts: item.threadTexts,
+          article
+        });
+
+        const nameBase = safeFilename(article?.title || item.tweetText || "x-bookmark");
+        const downloadName = `x-liker/${nameBase || "x-bookmark"}.txt`;
+
+        await updateHistoryItem(tweetUrl, {
+          status: "done",
+          article,
+          rawText,
+          downloadName
+        });
+      } catch (e) {
+        await updateHistoryItem(tweetUrl, {
+          status: "done",
+          error: e?.message || String(e),
+          article
+        });
+      }
+      return;
+    }
+
+    // Like/Bookmark events
     const payload = msg.payload || {};
     const kind = msg.type === "LIKE_EVENT" ? "like" : "bookmark";
 
@@ -299,21 +362,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     await addHistoryItem(baseItem);
 
-    // choose first external link if present
-    const firstLink = (baseItem.externalLinks || [])[0];
-    let article = null;
     try {
-      await updateHistoryItem(baseItem.tweetUrl, { status: "fetching" });
-      if (firstLink) {
-        try {
-          article = await fetchArticle(firstLink);
-        } catch (e) {
-          // fallback: render in a background tab and scrape DOM
-          article = await scrapeArticleViaTab(firstLink);
-        }
-      }
-
       if (kind === "like") {
+        // choose first external link if present
+        const firstLink = (baseItem.externalLinks || [])[0];
+        let article = null;
+        await updateHistoryItem(baseItem.tweetUrl, { status: "fetching" });
+        if (firstLink) {
+          try {
+            article = await fetchArticle(firstLink);
+          } catch {
+            article = await scrapeArticleViaTab(firstLink);
+          }
+        }
+
         await updateHistoryItem(baseItem.tweetUrl, { status: "summarizing", article });
 
         const outline = await llmOutline({
@@ -327,20 +389,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         await updateHistoryItem(baseItem.tweetUrl, { status: "done", outline, article });
       } else {
-        // bookmark: no LLM; just crawl and prepare downloadable text.
-        await updateHistoryItem(baseItem.tweetUrl, { status: "preparing", article });
+        // bookmark: FIRST save tweet/thread text (what user wants most)
+        await updateHistoryItem(baseItem.tweetUrl, { status: "preparing" });
+
         const rawText = buildDownloadText({
           kind,
           tweetUrl: baseItem.tweetUrl,
           tweetText: baseItem.tweetText,
           threadTexts: baseItem.threadTexts,
-          article
+          article: null
         });
-        const nameBase = safeFilename(article?.title || baseItem.tweetText || "x-bookmark");
+
+        const nameBase = safeFilename(baseItem.tweetText || "x-bookmark");
         const downloadName = `x-liker/${nameBase || "x-bookmark"}.txt`;
+
         await updateHistoryItem(baseItem.tweetUrl, {
           status: "done",
-          article,
           rawText,
           downloadName
         });
@@ -348,8 +412,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     } catch (e) {
       await updateHistoryItem(baseItem.tweetUrl, {
         status: "error",
-        error: e?.message || String(e),
-        article
+        error: e?.message || String(e)
       });
     }
   })();

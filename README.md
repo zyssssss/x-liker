@@ -38,13 +38,13 @@
 4. 等待几秒
 5. 在 Side Panel 里查看状态为 `done` 的总结；可 Copy/打开文章
 
-### 2) 收藏下载（Bookmark → Crawl → Download）
+### 2) 收藏下载（Bookmark → Tweet first → Optional external）
 1. 在推文上点击“收藏/Bookmark”按钮
-2. 插件会自动抓取：推文/线程文本 +（如有）外链文章正文
-   - 优先用 fetch 抓取
-   - 如果遇到站点反爬导致 `failed to fetch`，会自动改用“后台打开页面 → DOM 抓取”的方式
-3. Side Panel 会出现一条记录，并提供 **Download .txt** 按钮
-4. 点击 Download .txt，会把抓取内容以纯文本下载到本地
+2. 插件会先抓取并保存：**推文本身/线程内容**（这是默认下载内容）
+3. 如果检测到外链，Side Panel 会提供 **Fetch external link** 按钮：
+   - 你点了才会去抓外链文章正文，并把 txt 更新为“推文 + 外链文章”
+   - 优先用 fetch 抓取；如果遇到反爬导致 `failed to fetch`，会自动改用“后台打开页面 → DOM 抓取”
+4. 点击 **Download .txt** 下载纯文本
 
 ## 注意
 

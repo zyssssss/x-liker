@@ -57,9 +57,10 @@ async function render() {
 
     const btnCopy = el("button", { class: "btn small", text: "Copy" });
     const btnOpen = el("button", { class: "btn small", text: "Open article" });
+    const btnFetch = el("button", { class: "btn small", text: "Fetch external link" });
     const btnDl = el("button", { class: "btn small", text: "Download .txt" });
 
-    const actions = el("div", { class: "row" }, [btnCopy, btnOpen, btnDl]);
+    const actions = el("div", { class: "row" }, [btnCopy, btnOpen, btnFetch, btnDl]);
 
     btnCopy.addEventListener("click", async () => {
       const text = primaryText || "";
@@ -74,7 +75,22 @@ async function render() {
       chrome.tabs.create({ url });
     });
 
-    // Only enable download when we have rawText (bookmark event).
+    // Bookmark flow: user prefers tweet text first; external link is optional.
+    const hasExternal = Array.isArray(item.externalLinks) && item.externalLinks.length > 0;
+    const canFetch = hasExternal && !item.article?.text && item.status === "done";
+    btnFetch.disabled = !canFetch;
+    btnFetch.style.opacity = canFetch ? "1" : "0.5";
+    btnFetch.addEventListener("click", async () => {
+      if (!canFetch) return;
+      btnFetch.textContent = "Fetching...";
+      try {
+        chrome.runtime.sendMessage({ type: "FETCH_ARTICLE_FOR", tweetUrl: item.tweetUrl });
+      } finally {
+        setTimeout(() => (btnFetch.textContent = "Fetch external link"), 1200);
+      }
+    });
+
+    // Enable download when we have rawText.
     const canDownload = !!item.rawText && item.status === "done";
     btnDl.disabled = !canDownload;
     btnDl.style.opacity = canDownload ? "1" : "0.5";
