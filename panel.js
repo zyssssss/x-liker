@@ -64,9 +64,11 @@ async function render() {
         ].filter(Boolean).join("\n")
       : "";
 
+    body.textContent = repliesBlock || primaryText || "(no content yet)";
+
     const statusHint = status && status !== "done" ? `[${status}]` : "";
     const errLine = item.error ? `\n\nError: ${item.error}` : "";
-    body.textContent = (repliesBlock || primaryText || "(no content yet)") + (statusHint ? `\n\n${statusHint}` : "") + errLine;
+    if (statusHint || errLine) body.textContent += (statusHint ? `\n\n${statusHint}` : "") + errLine;
 
     const btnCopy = el("button", { class: "btn small", text: "Copy" });
     const btnOpen = el("button", { class: "btn small", text: "Open article" });
@@ -75,6 +77,15 @@ async function render() {
     const btnDl = el("button", { class: "btn small", text: "Download .txt" });
 
     const actions = el("div", { class: "row" }, [btnCopy, btnOpen, btnFetch, btnGen, btnDl]);
+
+    const replyLog = String(item.replyLog || "").trim();
+    const logArea = el("textarea", {
+      class: "pre",
+      readonly: "true",
+      style:
+        "width:100%; min-height:110px; margin-top:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px;"
+    });
+    logArea.value = replyLog || "点击“生成回复”后，这里会显示抓取/生成过程与最终结果。";
 
     btnCopy.addEventListener("click", async () => {
       const text = primaryText || "";
@@ -189,10 +200,10 @@ async function render() {
         repliesWrap.appendChild(row);
       }
 
-      const card = el("div", { class: "card" }, [header, meta, body, actions, repliesWrap]);
+      const card = el("div", { class: "card" }, [header, meta, body, actions, logArea, repliesWrap]);
       list.appendChild(card);
     } else {
-      const card = el("div", { class: "card" }, [header, meta, body, actions]);
+      const card = el("div", { class: "card" }, [header, meta, body, actions, logArea]);
       list.appendChild(card);
     }
   }

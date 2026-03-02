@@ -52,6 +52,16 @@ async function updateHistoryItem(tweetUrl, patch) {
   await chrome.storage.local.set({ history: next });
 }
 
+async function appendReplyLog(tweetUrl, line) {
+  const { history } = await chrome.storage.local.get(["history"]);
+  const arr = Array.isArray(history) ? history : [];
+  const item = arr.find((x) => x?.tweetUrl === tweetUrl);
+  const prev = String(item?.replyLog || "");
+  const ts = new Date().toLocaleTimeString();
+  const next = (prev ? prev + "\n" : "") + `[${ts}] ${line}`;
+  await updateHistoryItem(tweetUrl, { replyLog: next.slice(-12000) });
+}
+
 async function resolveFinalUrl(url) {
   // Follow redirects (t.co etc.)
   try {
@@ -458,14 +468,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const item = arr.find((x) => x?.tweetUrl === tweetUrl);
       if (!item) return;
 
-      await updateHistoryItem(tweetUrl, { status: "generating-replies", error: "" });
+      await updateHistoryItem(tweetUrl, {
+        status: "generating-replies",
+        error: "",
+        replyIdeas: [],
+        replySummary: "",
+        replyLog: ""
+      });
+      await appendReplyLog(tweetUrl, "开始生成回复");
 
       try {
+        const settings = await getSettings();
+        await appendReplyLog(tweetUrl, `LLM: ${settings.provider}/${settings.model}`);
+
         // Ensure article exists; if not, try fetch now from external link.
         let article = item.article;
 
         // Prefer X longform body if we already have it (no need for external link).
         if ((!article?.text || String(article.text).trim().length < 800) && item.xArticleText && String(item.xArticleText).trim().length >= 800) {
+          await appendReplyLog(tweetUrl, "使用X长文正文作为文章内容");
           article = {
             finalUrl: item.tweetUrl,
             title: item.article?.title || item.tweetText?.slice(0, 80) || "X Article",
@@ -477,7 +498,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         if (!article?.text) {
           const firstLink = (item.externalLinks || [])[0];
-          if (!firstLink) throw new Error("No external link found (and no X longform body)");
+          if (!firstLink) throw new Error("没有可用的文章正文：既无外链，也无X长文正文");
+          await appendReplyLog(tweetUrl, "抓取外链文章正文中…");
           try {
             article = await fetchArticle(firstLink);
           } catch {
@@ -485,7 +507,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         }
 
-        const settings = await getSettings();
+        await appendReplyLog(tweetUrl, `文章正文长度: ${String(article?.text || "").trim().length}`);
+        await appendReplyLog(tweetUrl, "调用模型生成多角度回复…");
 
         const out = await llmReplies({
           provider: settings.provider,
@@ -496,6 +519,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           article
         });
 
+        await appendReplyLog(tweetUrl, `生成完成，回复条数: ${(out.replies || []).length}`);
         await updateHistoryItem(tweetUrl, {
           status: "done",
           article,
@@ -503,6 +527,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           replyIdeas: out.replies || []
         });
       } catch (e) {
+        await appendReplyLog(tweetUrl, `失败: ${e?.message || String(e)}`);
         await updateHistoryItem(tweetUrl, {
           status: "done",
           error: e?.message || String(e)
