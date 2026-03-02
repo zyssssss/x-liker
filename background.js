@@ -8,7 +8,9 @@ const DEFAULTS = {
   // Keep only the latest item by default (auto-clear previous).
   // You can change this in Options.
   maxItems: 1,
-  language: "zh-CN"
+  language: "zh-CN",
+  // User-defined prompt to steer reply generation (multi-angle replies).
+  replyPrompt: ""
 };
 
 function sleep(ms) {
@@ -299,7 +301,7 @@ async function llmOutline({ provider, model, language, tweetText, threadTexts, a
   return norm(content || "");
 }
 
-async function llmReplies({ provider, model, language, tweetText, threadTexts, article }) {
+async function llmReplies({ provider, model, language, tweetText, threadTexts, article, replyPrompt }) {
   const apiKey = await getApiKey();
   if (!apiKey) {
     throw new Error(
@@ -327,7 +329,7 @@ async function llmReplies({ provider, model, language, tweetText, threadTexts, a
   if (tweetText) userParts.push(`Tweet text: ${tweetText}`);
   if (Array.isArray(threadTexts) && threadTexts.length) userParts.push(`Thread texts:\n- ${threadTexts.join("\n- ")}`);
 
-  const prompt =
+  const basePrompt =
     language.startsWith("zh")
       ? [
           "请只输出严格JSON（不要解释）。字段：",
@@ -342,6 +344,9 @@ async function llmReplies({ provider, model, language, tweetText, threadTexts, a
           "- replies: array of 6 objects: {angle, text} (text <= 60 chars)",
           "Cover multiple angles. No hallucinations, no ads."
         ].join("\n");
+
+  const extra = String(replyPrompt || "").trim();
+  const prompt = extra ? basePrompt + "\n\n" + "【用户自定义要求】\n" + extra : basePrompt;
 
   const body = {
     model,
@@ -516,7 +521,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           language: settings.language,
           tweetText: item.xArticleText || item.tweetText,
           threadTexts: item.threadTexts,
-          article
+          article,
+          replyPrompt: settings.replyPrompt
         });
 
         await appendReplyLog(tweetUrl, `生成完成，回复条数: ${(out.replies || []).length}`);

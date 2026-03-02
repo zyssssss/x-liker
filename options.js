@@ -20,6 +20,7 @@ async function load() {
   $("model").value = settings?.model || (provider === "openai" ? "gpt-4o-mini" : "deepseek-chat");
   $("language").value = settings?.language || "zh-CN";
   $("maxItems").value = settings?.maxItems ?? 1;
+  $("replyPrompt").value = settings?.replyPrompt || "";
 }
 
 async function save() {
@@ -29,10 +30,11 @@ async function save() {
     $("model").value.trim() || (provider === "openai" ? "gpt-4o-mini" : "deepseek-chat");
   const language = $("language").value;
   const maxItems = Math.max(1, Math.min(200, parseInt($("maxItems").value, 10) || 50));
+  const replyPrompt = $("replyPrompt").value || "";
 
   // Store key under provider-specific field; keep openai_api_key for backward compat
   const patch = {
-    settings: { provider, model, language, maxItems }
+    settings: { provider, model, language, maxItems, replyPrompt }
   };
   if (provider === "openai") {
     patch.openai_api_key = apiKey;

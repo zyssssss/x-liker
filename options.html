@@ -32,6 +32,10 @@
       <input id="maxItems" type="number" min="1" max="200" class="input" />
       <div class="hint">设为 1 = 每次点赞只保留最新一条（自动清理上一条）。</div>
 
+      <label class="lbl">Reply prompt（生成回复用）</label>
+      <textarea id="replyPrompt" class="input" style="min-height:140px; resize:vertical; padding:10px;"></textarea>
+      <div class="hint">可留空。这里的内容会影响“生成回复”的风格/结构/禁忌。</div>
+
       <div class="row">
         <button id="save" class="btn">Save</button>
         <span id="status" class="status"></span>
