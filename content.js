@@ -194,3 +194,52 @@ async function onClick(e) {
 }
 
 document.addEventListener("click", onClick, true);
+
+// Allow the side panel to insert a reply into the X composer.
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  (async () => {
+    if (msg?.type !== "INSERT_REPLY") return;
+    const text = String(msg.text || "");
+    const ok = await insertIntoComposerWithRetry(text);
+    sendResponse({ ok });
+  })().catch(() => sendResponse({ ok: false }));
+  return true;
+});
+
+async function insertIntoComposerWithRetry(text) {
+  for (let i = 0; i < 12; i++) {
+    const ok = insertIntoComposerOnce(text);
+    if (ok) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
+}
+
+function insertIntoComposerOnce(text) {
+  const candidates = [
+    'div[role="textbox"][data-testid="tweetTextarea_0"]',
+    'div[role="textbox"][contenteditable="true"]'
+  ];
+
+  let box = null;
+  for (const sel of candidates) {
+    const el = document.querySelector(sel);
+    if (el) {
+      box = el;
+      break;
+    }
+  }
+  if (!box) return false;
+
+  box.focus();
+
+  try {
+    document.execCommand("selectAll", false, null);
+    document.execCommand("insertText", false, text);
+  } catch {
+    box.textContent = text;
+    box.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  }
+
+  return true;
+}

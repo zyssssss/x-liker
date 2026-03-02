@@ -242,6 +242,109 @@ async function llmOutline({ provider, model, language, tweetText, threadTexts, a
   return norm(content || "");
 }
 
+async function llmReplies({ provider, model, language, tweetText, threadTexts, article }) {
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    throw new Error(
+      provider === "openai"
+        ? "Missing OpenAI API key. Set it in extension Options."
+        : "Missing DeepSeek API key. Set it in extension Options."
+    );
+  }
+
+  if (!article?.text || String(article.text).trim().length < 800) {
+    throw new Error("Article body is empty/too short; cannot generate meaningful replies.");
+  }
+
+  const system =
+    language.startsWith("zh")
+      ? "你是一个擅长在X(Twitter)写高质量评论回复的助手。你会基于文章内容给出不同角度的短回复，避免编造。"
+      : "You write high-quality X (Twitter) replies based on an article. Provide multiple angles; do not hallucinate.";
+
+  const userParts = [];
+  if (article?.finalUrl) userParts.push(`Article URL: ${article.finalUrl}`);
+  if (article?.title) userParts.push(`Article title: ${article.title}`);
+  if (article?.description) userParts.push(`Article description(meta): ${article.description}`);
+  userParts.push(`Article text(excerpt): ${article.text}`);
+
+  if (tweetText) userParts.push(`Tweet text: ${tweetText}`);
+  if (Array.isArray(threadTexts) && threadTexts.length) userParts.push(`Thread texts:\n- ${threadTexts.join("\n- ")}`);
+
+  const prompt =
+    language.startsWith("zh")
+      ? [
+          "请只输出严格JSON（不要解释）。字段：",
+          "- summary: 1句<=40字",
+          "- replies: 6个对象数组，每个对象字段：angle(角度名<=8字)、text(可直接发布<=60字)",
+          "角度建议覆盖：赞同/补充案例/提出质疑/提问/提炼方法/幽默但不冒犯。",
+          "规则：不要提及‘我无法访问’；不要硬广；不要捏造文章没提到的事实。"
+        ].join("\n")
+      : [
+          "Output strict JSON only (no explanation). Fields:",
+          "- summary (<=40 chars)",
+          "- replies: array of 6 objects: {angle, text} (text <= 60 chars)",
+          "Cover multiple angles. No hallucinations, no ads."
+        ].join("\n");
+
+  const body = {
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userParts.join("\n\n") + "\n\n" + prompt }
+    ],
+    temperature: 0.6,
+    max_tokens: 800
+  };
+
+  const endpoint =
+    provider === "openai"
+      ? "https://api.openai.com/v1/chat/completions"
+      : "https://api.deepseek.com/v1/chat/completions";
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    const label = provider === "openai" ? "OpenAI" : "DeepSeek";
+    throw new Error(`${label} error ${res.status}: ${t.slice(0, 300)}`);
+  }
+
+  const json = await res.json();
+  const content = json?.choices?.[0]?.message?.content;
+  const raw = String(content || "").trim();
+  if (!raw) throw new Error("Empty model output");
+
+  // Extract JSON best-effort
+  const s = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+  const first = s.indexOf("{");
+  const last = s.lastIndexOf("}");
+  const jsonStr = first >= 0 && last > first ? s.slice(first, last + 1) : s;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (e) {
+    throw new Error("Model did not return valid JSON");
+  }
+
+  const replies = Array.isArray(parsed?.replies) ? parsed.replies : [];
+  const normReplies = replies
+    .map((r) => ({ angle: String(r?.angle || "").trim(), text: String(r?.text || "").trim() }))
+    .filter((r) => r.text);
+
+  return {
+    summary: String(parsed?.summary || "").trim(),
+    replies: normReplies
+  };
+}
+
 function safeFilename(s) {
   return (s || "")
     .replace(/[\\/:*?"<>|]/g, "-")
@@ -287,10 +390,66 @@ function buildDownloadText({ kind, tweetUrl, tweetText, threadTexts, article, ou
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type !== "LIKE_EVENT" && msg?.type !== "BOOKMARK_EVENT" && msg?.type !== "FETCH_ARTICLE_FOR") return;
+  if (
+    msg?.type !== "LIKE_EVENT" &&
+    msg?.type !== "BOOKMARK_EVENT" &&
+    msg?.type !== "FETCH_ARTICLE_FOR" &&
+    msg?.type !== "GENERATE_REPLIES_FOR"
+  )
+    return;
 
   (async () => {
     const settings = await getSettings();
+
+    // User-triggered: generate replies for an existing item (bookmark preferred)
+    if (msg?.type === "GENERATE_REPLIES_FOR") {
+      const tweetUrl = msg?.tweetUrl;
+      if (!tweetUrl) return;
+
+      const { history } = await chrome.storage.local.get(["history"]);
+      const arr = Array.isArray(history) ? history : [];
+      const item = arr.find((x) => x?.tweetUrl === tweetUrl);
+      if (!item) return;
+
+      await updateHistoryItem(tweetUrl, { status: "generating-replies", error: "" });
+
+      try {
+        // Ensure article exists; if not, try fetch now from external link.
+        let article = item.article;
+        if (!article?.text) {
+          const firstLink = (item.externalLinks || [])[0];
+          if (!firstLink) throw new Error("No external link found");
+          try {
+            article = await fetchArticle(firstLink);
+          } catch {
+            article = await scrapeArticleViaTab(firstLink);
+          }
+        }
+
+        const settings = await getSettings();
+        const out = await llmReplies({
+          provider: settings.provider,
+          model: settings.model,
+          language: settings.language,
+          tweetText: item.xArticleText || item.tweetText,
+          threadTexts: item.threadTexts,
+          article
+        });
+
+        await updateHistoryItem(tweetUrl, {
+          status: "done",
+          article,
+          replySummary: out.summary || "",
+          replyIdeas: out.replies || []
+        });
+      } catch (e) {
+        await updateHistoryItem(tweetUrl, {
+          status: "done",
+          error: e?.message || String(e)
+        });
+      }
+      return;
+    }
 
     // User-triggered: fetch article later for an existing bookmark item
     if (msg?.type === "FETCH_ARTICLE_FOR") {
@@ -414,25 +573,43 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           downloadName
         });
       } else {
-        // bookmark: FIRST save tweet/thread text (what user wants most)
-        await updateHistoryItem(baseItem.tweetUrl, { status: "preparing" });
+        // bookmark: fetch article content now (so user can generate replies later).
+        await updateHistoryItem(baseItem.tweetUrl, { status: "fetching-article", error: "" });
+
+        const firstLink = (baseItem.externalLinks || [])[0];
+        let article = null;
+        if (firstLink) {
+          try {
+            try {
+              article = await fetchArticle(firstLink);
+            } catch {
+              article = await scrapeArticleViaTab(firstLink);
+            }
+          } catch {
+            article = null;
+          }
+        }
 
         const rawText = buildDownloadText({
           kind,
           tweetUrl: baseItem.tweetUrl,
           tweetText: baseItem.xArticleText || baseItem.tweetText,
           threadTexts: baseItem.threadTexts,
-          article: null,
+          article,
           outline: null
         });
 
-        const nameBase = safeFilename(baseItem.tweetText || "x-bookmark");
+        const nameBase = safeFilename(article?.title || baseItem.tweetText || "x-bookmark");
         const downloadName = `x-liker/${nameBase || "x-bookmark"}.txt`;
 
         await updateHistoryItem(baseItem.tweetUrl, {
           status: "done",
+          article,
           rawText,
-          downloadName
+          downloadName,
+          // replies are generated on-demand
+          replySummary: "",
+          replyIdeas: []
         });
       }
     } catch (e) {

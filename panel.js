@@ -53,14 +53,26 @@ async function render() {
 
     const body = el("pre", { class: "pre" });
     const primaryText = item.outline || item.rawText || "";
-    body.textContent = primaryText || (item.error ? `Error: ${item.error}` : "(no outline yet)");
+
+    const repliesBlock = Array.isArray(item.replyIdeas) && item.replyIdeas.length
+      ? [
+          item.replySummary ? `Reply summary: ${item.replySummary}` : "",
+          ...item.replyIdeas.map((r, i) => {
+            const angle = r.angle ? `【${r.angle}】` : "";
+            return `${i + 1}. ${angle}${r.text}`;
+          })
+        ].filter(Boolean).join("\n")
+      : "";
+
+    body.textContent = repliesBlock || primaryText || (item.error ? `Error: ${item.error}` : "(no content yet)");
 
     const btnCopy = el("button", { class: "btn small", text: "Copy" });
     const btnOpen = el("button", { class: "btn small", text: "Open article" });
     const btnFetch = el("button", { class: "btn small", text: "Fetch external link" });
+    const btnGen = el("button", { class: "btn small", text: "生成回复" });
     const btnDl = el("button", { class: "btn small", text: "Download .txt" });
 
-    const actions = el("div", { class: "row" }, [btnCopy, btnOpen, btnFetch, btnDl]);
+    const actions = el("div", { class: "row" }, [btnCopy, btnOpen, btnFetch, btnGen, btnDl]);
 
     btnCopy.addEventListener("click", async () => {
       const text = primaryText || "";
@@ -75,7 +87,7 @@ async function render() {
       chrome.tabs.create({ url });
     });
 
-    // Bookmark flow: user prefers tweet text first; external link is optional.
+    // Bookmark flow: external link is optional.
     const hasExternal = Array.isArray(item.externalLinks) && item.externalLinks.length > 0;
     const canFetch = hasExternal && !item.article?.text && item.status === "done";
     btnFetch.disabled = !canFetch;
@@ -87,6 +99,19 @@ async function render() {
         chrome.runtime.sendMessage({ type: "FETCH_ARTICLE_FOR", tweetUrl: item.tweetUrl });
       } finally {
         setTimeout(() => (btnFetch.textContent = "Fetch external link"), 1200);
+      }
+    });
+
+    const canGen = item.status === "done" && !!item.article?.text && (item.kind === "bookmark" || item.kind === "like");
+    btnGen.disabled = !canGen;
+    btnGen.style.opacity = canGen ? "1" : "0.5";
+    btnGen.addEventListener("click", async () => {
+      if (!canGen) return;
+      btnGen.textContent = "生成中...";
+      try {
+        chrome.runtime.sendMessage({ type: "GENERATE_REPLIES_FOR", tweetUrl: item.tweetUrl });
+      } finally {
+        setTimeout(() => (btnGen.textContent = "生成回复"), 1200);
       }
     });
 
@@ -110,8 +135,50 @@ async function render() {
       }
     });
 
-    const card = el("div", { class: "card" }, [header, meta, body, actions]);
-    list.appendChild(card);
+    // If replies exist, render per-reply actions (copy / insert to X composer)
+    if (Array.isArray(item.replyIdeas) && item.replyIdeas.length) {
+      const repliesWrap = el("div", { class: "list" });
+
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const activeTabId = tabs?.[0]?.id;
+
+      for (const r of item.replyIdeas.slice(0, 10)) {
+        const row = el("div", { class: "card" });
+        const t = `${r.angle ? `【${r.angle}】` : ""}${r.text}`;
+        row.appendChild(el("div", { class: "hint", text: r.angle || "reply" }));
+        row.appendChild(el("div", { class: "pre", text: t }));
+
+        const b1 = el("button", { class: "btn small", text: "复制" });
+        const b2 = el("button", { class: "btn small", text: "填入回复框" });
+        const act = el("div", { class: "row" }, [b1, b2]);
+
+        b1.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(r.text);
+          b1.textContent = "Copied";
+          setTimeout(() => (b1.textContent = "复制"), 800);
+        });
+
+        b2.disabled = !activeTabId;
+        b2.style.opacity = activeTabId ? "1" : "0.5";
+        b2.addEventListener("click", async () => {
+          if (!activeTabId) return;
+          try {
+            await chrome.tabs.sendMessage(activeTabId, { type: "INSERT_REPLY", text: r.text });
+          } catch {
+            // ignore
+          }
+        });
+
+        row.appendChild(act);
+        repliesWrap.appendChild(row);
+      }
+
+      const card = el("div", { class: "card" }, [header, meta, body, actions, repliesWrap]);
+      list.appendChild(card);
+    } else {
+      const card = el("div", { class: "card" }, [header, meta, body, actions]);
+      list.appendChild(card);
+    }
   }
 }
 
