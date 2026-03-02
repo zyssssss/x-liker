@@ -22,6 +22,10 @@ function fmtTime(iso) {
 }
 
 async function render() {
+  // Preserve scroll position (the panel keeps re-rendering as history updates).
+  const scrollEl = document.scrollingElement || document.documentElement;
+  const prevScrollTop = scrollEl.scrollTop;
+
   const { history } = await chrome.storage.local.get(["history"]);
   const arr = Array.isArray(history) ? history : [];
   const list = document.getElementById("list");
@@ -207,6 +211,13 @@ async function render() {
       list.appendChild(card);
     }
   }
+
+  // Restore scroll position after DOM updates.
+  // Use rAF to ensure layout is applied.
+  requestAnimationFrame(() => {
+    const el = document.scrollingElement || document.documentElement;
+    el.scrollTop = prevScrollTop;
+  });
 }
 
 document.getElementById("openOptions").addEventListener("click", () => {
@@ -255,6 +266,16 @@ document.getElementById("clear").addEventListener("click", async () => {
   render();
 });
 
-// refresh periodically while panel is open
+// Refresh when storage changes (avoids resetting scroll position every 1.5s)
 render();
-setInterval(render, 1500);
+
+let renderTimer = null;
+chrome.storage.onChanged.addListener((_changes, area) => {
+  if (area !== "local") return;
+  // Debounce renders to avoid thrash.
+  if (renderTimer) clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => {
+    renderTimer = null;
+    render();
+  }, 120);
+});
