@@ -177,6 +177,53 @@ async function scrapeArticleViaTab(url) {
   }
 }
 
+async function scrapeXLongformViaTab(tweetUrl) {
+  // Best-effort: open the X tweet page and extract longform article text if present.
+  const finalUrl = await resolveFinalUrl(tweetUrl);
+  const tab = await chrome.tabs.create({ url: finalUrl, active: false });
+  const tabId = tab.id;
+  if (tabId == null) throw new Error("Failed to create tab for X longform scrape");
+
+  const waitComplete = async (timeoutMs = 20000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const t = await chrome.tabs.get(tabId);
+      if (t.status === "complete") return;
+      await sleep(250);
+    }
+    throw new Error("Timeout waiting for X tab to load");
+  };
+
+  try {
+    await waitComplete();
+
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
+        const root =
+          document.querySelector('[data-testid="article"]') ||
+          document.querySelector('article[role="article"]') ||
+          document.querySelector('main');
+
+        const text = norm(root?.innerText || "");
+        const title = norm(document.querySelector('h1')?.innerText) || norm(document.title);
+        return { title, text: text.slice(0, 40000) };
+      }
+    });
+
+    const text = String(result?.text || "").trim();
+    if (text.length < 800) return { finalUrl, title: result?.title || "", text: "" };
+    return { finalUrl, title: result?.title || "", text };
+  } finally {
+    try {
+      await chrome.tabs.remove(tabId);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 async function llmOutline({ provider, model, language, tweetText, threadTexts, article }) {
   const apiKey = await getApiKey();
   if (!apiKey) {
@@ -600,6 +647,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
           } catch {
             article = null;
+          }
+        } else {
+          // No external link: try scraping X longform body from the tweet page itself.
+          try {
+            const xlong = await scrapeXLongformViaTab(baseItem.tweetUrl);
+            if (xlong?.text) {
+              article = {
+                finalUrl: xlong.finalUrl,
+                title: xlong.title || "X Article",
+                description: "",
+                text: xlong.text.slice(0, 12000),
+                contentType: "text/plain"
+              };
+            }
+          } catch {
+            // ignore
           }
         }
 

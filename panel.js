@@ -104,7 +104,7 @@ async function render() {
       }
     });
 
-    const hasBody = (item.article && item.article.text) || (item.xArticleText && item.xArticleText.length > 800);
+    const hasBody = (item.article && item.article.text && item.article.text.length >= 800) || (item.xArticleText && item.xArticleText.length >= 800);
     const canGen = item.status === "done" && !!hasBody && (item.kind === "bookmark" || item.kind === "like");
     btnGen.disabled = !canGen;
     btnGen.style.opacity = canGen ? "1" : "0.5";
