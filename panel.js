@@ -64,7 +64,9 @@ async function render() {
         ].filter(Boolean).join("\n")
       : "";
 
-    body.textContent = repliesBlock || primaryText || (item.error ? `Error: ${item.error}` : "(no content yet)");
+    const statusHint = status && status !== "done" ? `[${status}]` : "";
+    const errLine = item.error ? `\n\nError: ${item.error}` : "";
+    body.textContent = (repliesBlock || primaryText || "(no content yet)") + (statusHint ? `\n\n${statusHint}` : "") + errLine;
 
     const btnCopy = el("button", { class: "btn small", text: "Copy" });
     const btnOpen = el("button", { class: "btn small", text: "Open article" });
@@ -116,10 +118,16 @@ async function render() {
     btnGen.addEventListener("click", async () => {
       if (!canGen) return;
       btnGen.textContent = "生成中...";
+      btnGen.disabled = true;
       try {
-        chrome.runtime.sendMessage({ type: "GENERATE_REPLIES_FOR", tweetUrl: item.tweetUrl });
+        chrome.runtime.sendMessage({ type: "GENERATE_REPLIES_FOR", tweetUrl: item.tweetUrl }, () => {
+          // background runs async; UI will refresh via interval.
+        });
       } finally {
-        setTimeout(() => (btnGen.textContent = "生成回复"), 1200);
+        setTimeout(() => {
+          btnGen.textContent = "生成回复";
+          btnGen.disabled = false;
+        }, 1200);
       }
     });
 

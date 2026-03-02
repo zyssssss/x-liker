@@ -416,9 +416,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         // Ensure article exists; if not, try fetch now from external link.
         let article = item.article;
+
+        // Prefer X longform body if we already have it (no need for external link).
+        if ((!article?.text || String(article.text).trim().length < 800) && item.xArticleText && String(item.xArticleText).trim().length >= 800) {
+          article = {
+            finalUrl: item.tweetUrl,
+            title: item.article?.title || item.tweetText?.slice(0, 80) || "X Article",
+            description: "",
+            text: String(item.xArticleText).slice(0, 12000),
+            contentType: "text/plain"
+          };
+        }
+
         if (!article?.text) {
           const firstLink = (item.externalLinks || [])[0];
-          if (!firstLink) throw new Error("No external link found");
+          if (!firstLink) throw new Error("No external link found (and no X longform body)");
           try {
             article = await fetchArticle(firstLink);
           } catch {
@@ -427,16 +439,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         const settings = await getSettings();
-        // If no external article body but we have X longform text, treat it as the article body.
-        if ((!article?.text || String(article.text).trim().length < 800) && item.xArticleText) {
-          article = {
-            finalUrl: item.tweetUrl,
-            title: item.tweetText?.slice(0, 80) || "X Article",
-            description: "",
-            text: String(item.xArticleText).slice(0, 12000),
-            contentType: "text/plain"
-          };
-        }
 
         const out = await llmReplies({
           provider: settings.provider,
