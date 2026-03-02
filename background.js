@@ -427,6 +427,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         const settings = await getSettings();
+        // If no external article body but we have X longform text, treat it as the article body.
+        if ((!article?.text || String(article.text).trim().length < 800) && item.xArticleText) {
+          article = {
+            finalUrl: item.tweetUrl,
+            title: item.tweetText?.slice(0, 80) || "X Article",
+            description: "",
+            text: String(item.xArticleText).slice(0, 12000),
+            contentType: "text/plain"
+          };
+        }
+
         const out = await llmReplies({
           provider: settings.provider,
           model: settings.model,

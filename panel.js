@@ -102,9 +102,17 @@ async function render() {
       }
     });
 
-    const canGen = item.status === "done" && !!item.article?.text && (item.kind === "bookmark" || item.kind === "like");
+    const hasBody = (item.article && item.article.text) || (item.xArticleText && item.xArticleText.length > 800);
+    const canGen = item.status === "done" && !!hasBody && (item.kind === "bookmark" || item.kind === "like");
     btnGen.disabled = !canGen;
     btnGen.style.opacity = canGen ? "1" : "0.5";
+    btnGen.title = canGen
+      ? ""
+      : hasExternal
+        ? "未抓到文章正文：先点 Fetch external link 抓取文章内容"
+        : (item.xArticleText && item.xArticleText.length < 800)
+          ? "当前是X长文但正文太短/未加载完全"
+          : "这条收藏没有外链文章正文可用（没有 external link / 也不是X长文）";
     btnGen.addEventListener("click", async () => {
       if (!canGen) return;
       btnGen.textContent = "生成中...";
